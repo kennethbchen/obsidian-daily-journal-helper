@@ -1,34 +1,82 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, FileSystemAdapter, TFile } from 'obsidian';
+import {normalizePath } from 'obsidian';
+import * as internal from 'stream';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+interface DailyJournalHelperSettings {
+	numberRolloverOffset: number;
+	fileDestination: String;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: DailyJournalHelperSettings = {
+	numberRolloverOffset: 5,
+	fileDestination: "Daily Journal"
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+function getDays(numberRolloverOffset: number) {
+	var startDate: Date = new Date("2019-07-07T00:00:00");
+
+	var endDate: Date = new Date();
+
+	// Offset the hour of day when the number changes
+	if (endDate.getHours() <= numberRolloverOffset) {
+		endDate.setDate(endDate.getDate() - 1);
+	}
+
+	return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));	
+}
+
+async function openOrCreateEntry(destinationFolder: string, title: string): Promise<void> {
+	var filePath: string = normalizePath(destinationFolder + title) + ".md";
+	
+	// Create folder if not exists
+	if (! await this.app.vault.adapter.exists(destinationFolder)) {
+		this.app.vault.createFolder(destinationFolder);
+	}
+
+	// Create file if not exists
+	if (! await this.app.vault.adapter.exists(filePath)) {
+		
+		await this.app.vault.create(filePath, "");
+		new Notice("Created " + filePath);
+	}
+
+	// Open in active leaf
+	
+	const file = await this.app.vault.getFileByPath(filePath);
+	
+	var leaf = this.app.workspace.getLeaf(false);
+	
+	await leaf.openFile(file);
+
+	new Notice("Opened " + filePath);
+
+	
+
+}
+
+export default class DailyJournalHelper extends Plugin {
+	settings: DailyJournalHelperSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('calendar', "Open today's journal note", (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+			//new Notice(getDays(this.settings.numberRolloverOffset).toString());
+			
+			openOrCreateEntry(this.settings.fileDestination.toString(), getDays(this.settings.numberRolloverOffset).toString());
+			
 		});
+
 		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+		//ribbonIconEl.addClass('my-plugin-ribbon-class');
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+		//const statusBarItemEl = this.addStatusBarItem();
+		//statusBarItemEl.setText('Status Bar Text');
 
 		// This adds a simple command that can be triggered anywhere
+		/*
 		this.addCommand({
 			id: 'open-sample-modal-simple',
 			name: 'Open sample modal (simple)',
@@ -36,6 +84,7 @@ export default class MyPlugin extends Plugin {
 				new SampleModal(this.app).open();
 			}
 		});
+		
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: 'sample-editor-command',
@@ -64,6 +113,7 @@ export default class MyPlugin extends Plugin {
 				}
 			}
 		});
+		*/
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -108,9 +158,9 @@ class SampleModal extends Modal {
 }
 
 class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: DailyJournalHelper;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: DailyJournalHelper) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -121,14 +171,27 @@ class SampleSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('Number Rollover Offset')
+			.setDesc('Offset the hour of day when the number changes')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('Enter whole number')
+				.setValue(this.plugin.settings.numberRolloverOffset.toString())
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.numberRolloverOffset = parseInt(value);
 					await this.plugin.saveSettings();
-				}));
+				}))
+
+		new Setting(containerEl)
+			.setName('Journal Entry Location')
+			.setDesc('Location to store journal entries')
+			.addText(text => text
+				.setPlaceholder("E.g 'Daily Journal/'")
+				.setValue(this.plugin.settings.fileDestination.toString())
+				.onChange(async (value) => {
+					this.plugin.settings.fileDestination = value;
+					await this.plugin.saveSettings();
+				})
+				);
+			
 	}
 }
