@@ -6,13 +6,15 @@ import * as internal from 'stream';
 interface DailyJournalHelperSettings {
 	numberRolloverOffset: number;
 	fileDestination: String;
-	templatePath: string
+	templatePath: string;
+	filenamePrefix: string;
 }
 
 const DEFAULT_SETTINGS: DailyJournalHelperSettings = {
 	numberRolloverOffset: 5,
 	fileDestination: "Daily Journal",
-	templatePath: ""
+	templatePath: "",
+	filenamePrefix: "Daily Journal "
 }
 
 function getJournalDate(numberRolloverOffset: number): Date {
@@ -26,6 +28,7 @@ function getJournalDate(numberRolloverOffset: number): Date {
 	
 	return date;
 }
+
 function getDays(numberRolloverOffset: number): number {
 	var startDate: Date = new Date("2019-07-07T00:00:00");
 
@@ -70,7 +73,7 @@ async function openOrCreateEntry(destinationFolder: string, title: string, templ
 async function readTemplateData(templatePath: string): Promise<string> {
 
 	var validTemplateExists = templatePath !== "" && await this.app.vault.adapter.exists(templatePath);
-			
+	
 	var templateData = "";
 
 	// Check if there is a template to apply
@@ -102,7 +105,8 @@ export default class DailyJournalHelper extends Plugin {
 				templateData = templateData.replace("{{ date }}", moment().format());
 				templateData = templateData.replace("{{ journal_date }}", moment(d).format("YYYY-MM-DD"));
 
-				openOrCreateEntry(this.settings.fileDestination.toString(), getDays(this.settings.numberRolloverOffset).toString(), templateData);
+				var fileName = `${this.settings.filenamePrefix}${getDays(this.settings.numberRolloverOffset).toString()}`;
+				openOrCreateEntry(this.settings.fileDestination.toString(), fileName, templateData);
 			});
 
 
@@ -248,6 +252,19 @@ class DailyJournalSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			})
 			);
+		
+		new Setting(containerEl)
+		.setName('Journal filename prefix')
+		.setDesc('Prefix of filename for journal. Make sure to include trailing spaces if needed. "Daily Journal " becomes "Daily Journal xxxx".')
+		.addText(text => text
+			.setPlaceholder("E.g 'Daily Journal '")
+			.setValue(this.plugin.settings.filenamePrefix.toString())
+			.onChange(async (value) => {
+				this.plugin.settings.filenamePrefix = value;
+				await this.plugin.saveSettings();
+			})
+			);
+			
 			
 	}
 }
