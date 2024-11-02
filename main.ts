@@ -99,13 +99,15 @@ export default class DailyJournalHelper extends Plugin {
 			readTemplateData(this.settings.templatePath).then((data) => {
 				var templateData: string = data;
 
-				var d = getJournalDate(this.settings.numberRolloverOffset);
+				var date = getJournalDate(this.settings.numberRolloverOffset);
+				var number = getDays(this.settings.numberRolloverOffset).toString();
 
 				// Fill in template data if needed
 				templateData = templateData.replace("{{ date }}", moment().format());
-				templateData = templateData.replace("{{ journal_date }}", moment(d).format("YYYY-MM-DD"));
-
-				var fileName = `${this.settings.filenamePrefix}${getDays(this.settings.numberRolloverOffset).toString()}`;
+				templateData = templateData.replace("{{ journal_date }}", moment(date).format("YYYY-MM-DD"));
+				templateData = templateData.replace("{{ journal_number }}", number);
+				
+				var fileName = `${this.settings.filenamePrefix}${number}`;
 				openOrCreateEntry(this.settings.fileDestination.toString(), fileName, templateData);
 			});
 
