@@ -30,7 +30,7 @@ function getJournalDate(numberRolloverOffset: number): Date {
 }
 
 function getDays(numberRolloverOffset: number): number {
-	var startDate: Date = new Date("2019-07-07T00:00:00");
+	var startDate: Date = new Date("2019-07-07T00:00:00-04:00");
 
 	var endDate: Date = getJournalDate(numberRolloverOffset);
 
@@ -104,10 +104,11 @@ export default class DailyJournalHelper extends Plugin {
 
 				// Fill in template data if needed
 				templateData = templateData.replace("{{ date }}", moment().format());
-				templateData = templateData.replace("{{ journal_date }}", moment(date).format("YYYY-MM-DD"));
+				templateData = templateData.replace("{{ journal_date }}", moment(date).hour(0).minute(0).second(0).format());
 				templateData = templateData.replace("{{ journal_number }}", number);
-				
+
 				var fileName = `${this.settings.filenamePrefix}${number}`;
+
 				openOrCreateEntry(this.settings.fileDestination.toString(), fileName, templateData);
 			});
 
