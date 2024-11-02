@@ -1,43 +1,58 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, FileSystemAdapter, TFile } from 'obsidian';
 import {normalizePath } from 'obsidian';
+import { moment } from 'obsidian';
 import * as internal from 'stream';
 
 interface DailyJournalHelperSettings {
 	numberRolloverOffset: number;
 	fileDestination: String;
+	templatePath: string
 }
 
 const DEFAULT_SETTINGS: DailyJournalHelperSettings = {
 	numberRolloverOffset: 5,
-	fileDestination: "Daily Journal"
+	fileDestination: "Daily Journal",
+	templatePath: ""
 }
 
-function getDays(numberRolloverOffset: number) {
-	var startDate: Date = new Date("2019-07-07T00:00:00");
+function getJournalDate(numberRolloverOffset: number): Date {
 
-	var endDate: Date = new Date();
+	var date: Date = new Date();
 
 	// Offset the hour of day when the number changes
-	if (endDate.getHours() <= numberRolloverOffset) {
-		endDate.setDate(endDate.getDate() - 1);
+	if (date.getHours() <= numberRolloverOffset) {
+		date.setDate(date.getDate() - 1);
 	}
+	
+	return date;
+}
+function getDays(numberRolloverOffset: number): number {
+	var startDate: Date = new Date("2019-07-07T00:00:00");
+
+	var endDate: Date = getJournalDate(numberRolloverOffset);
 
 	return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));	
 }
 
-async function openOrCreateEntry(destinationFolder: string, title: string): Promise<void> {
+async function openOrCreateEntry(destinationFolder: string, title: string, template: string = ""): Promise<void> {
 	var filePath: string = normalizePath(destinationFolder + title) + ".md";
 	
 	// Create folder if not exists
 	if (! await this.app.vault.adapter.exists(destinationFolder)) {
 		this.app.vault.createFolder(destinationFolder);
 	}
-
+	
 	// Create file if not exists
 	if (! await this.app.vault.adapter.exists(filePath)) {
 		
-		await this.app.vault.create(filePath, "");
+		if (template !== "") {
+			await this.app.vault.create(filePath, template);
+		} else {
+			await this.app.vault.create(filePath, "");
+		}
+
 		new Notice("Created " + filePath);
+		
 	}
 
 	// Open in active leaf
@@ -50,8 +65,22 @@ async function openOrCreateEntry(destinationFolder: string, title: string): Prom
 
 	new Notice("Opened " + filePath);
 
-	
+}
 
+async function readTemplateData(templatePath: string): Promise<string> {
+
+	var validTemplateExists = templatePath !== "" && await this.app.vault.adapter.exists(templatePath);
+			
+	var templateData = "";
+
+	// Check if there is a template to apply
+	if (validTemplateExists) {
+		// Read template
+		
+		templateData = await this.app.vault.adapter.read(templatePath);
+
+	}
+	return templateData
 }
 
 export default class DailyJournalHelper extends Plugin {
@@ -62,9 +91,22 @@ export default class DailyJournalHelper extends Plugin {
 
 		const ribbonIconEl = this.addRibbonIcon('calendar', "Open today's journal note", (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			//new Notice(getDays(this.settings.numberRolloverOffset).toString());
+
+
+			readTemplateData(this.settings.templatePath).then((data) => {
+				var templateData: string = data;
+
+				var d = getJournalDate(this.settings.numberRolloverOffset);
+
+				// Fill in template data if needed
+				templateData = templateData.replace("{{ date }}", moment().format());
+				templateData = templateData.replace("{{ journal_date }}", moment(d).format("YYYY-MM-DD"));
+
+				openOrCreateEntry(this.settings.fileDestination.toString(), getDays(this.settings.numberRolloverOffset).toString(), templateData);
+			});
+
+
 			
-			openOrCreateEntry(this.settings.fileDestination.toString(), getDays(this.settings.numberRolloverOffset).toString());
 			
 		});
 
@@ -116,7 +158,7 @@ export default class DailyJournalHelper extends Plugin {
 		*/
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new DailyJournalSettingTab(this.app, this));
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
@@ -141,6 +183,7 @@ export default class DailyJournalHelper extends Plugin {
 	}
 }
 
+/*
 class SampleModal extends Modal {
 	constructor(app: App) {
 		super(app);
@@ -156,8 +199,9 @@ class SampleModal extends Modal {
 		contentEl.empty();
 	}
 }
+*/
 
-class SampleSettingTab extends PluginSettingTab {
+class DailyJournalSettingTab extends PluginSettingTab {
 	plugin: DailyJournalHelper;
 
 	constructor(app: App, plugin: DailyJournalHelper) {
@@ -192,6 +236,18 @@ class SampleSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				})
 				);
+
+		new Setting(containerEl)
+		.setName('Journal Template Location')
+		.setDesc('Location to file containing daily journal template')
+		.addText(text => text
+			.setPlaceholder("E.g 'Template.md'")
+			.setValue(this.plugin.settings.templatePath.toString())
+			.onChange(async (value) => {
+				this.plugin.settings.templatePath = value;
+				await this.plugin.saveSettings();
+			})
+			);
 			
 	}
 }
