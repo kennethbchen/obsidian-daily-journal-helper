@@ -30,7 +30,9 @@ function getJournalDate(numberRolloverOffset: number): Date {
 }
 
 function getDays(numberRolloverOffset: number): number {
-	var startDate: Date = new Date("2019-07-07T00:00:00-04:00");
+
+	// Use the current timezone to eliminate variation in measurement based on timezone
+	var startDate: Date = new Date(`2019-07-07T00:00:00${moment().format("Z")}`);
 
 	var endDate: Date = getJournalDate(numberRolloverOffset);
 
@@ -167,6 +169,7 @@ export default class DailyJournalHelper extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new DailyJournalSettingTab(this.app, this));
 
+		/*
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
@@ -175,6 +178,7 @@ export default class DailyJournalHelper extends Plugin {
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
 		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		*/
 	}
 
 	onunload() {
