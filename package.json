@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-daily-journal-helper",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "Provides helper functions for daily journal notes.",
 	"main": "main.js",
 	"scripts": {
